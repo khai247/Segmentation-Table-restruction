@@ -2,6 +2,10 @@ import torch
 import torchvision
 from data import SegmentDataset
 from torch.utils.data import DataLoader
+import cv2
+import numpy as np
+import statistics
+
 
 def save_checkpoint(state, filename=" "):
     print("=>Saving checkpoint")
@@ -92,6 +96,45 @@ def check_accuracy(loader, model, device='cuda'):
     )
     print(f"Dice score:{dice_score/len(loader)}")
     model.train()
+    
+    
+def create_mask(img_h, img_w, label_path,LINE_HEIGHT_RATIO):
+    line_mask = np.zeros((img_h,img_w))
 
+    line_heights = []
+    line_heights_2 = []
+
+    with open(label_path,'r') as f:
+
+        label_lines = f.readlines()
+        # draw line mask
+        for line in label_lines:
+            line_content = line.strip().split(' ') if '[' not in line else ['[' + a for a in line.strip().split('[')]
+            line_type = line_content[0]
+            if 'line' in line_type or 'scan' in line_type:
+                if len(line_content) == 5: # type x,y,w,h
+                    x, y, w, h = [int(num) for num in line_content[1:]]
+                    line_mask[y:y+h, x:x+w] = 255
+                    line_heights.append(h)
+                elif len(line_content) == 3: # type x_points, y_points
+                    if ',' in line_content[1].strip()[1:-1]:
+                        sep = ', '
+                    else:
+                        sep = ' '
+                    x_points, y_points = np.fromstring(line_content[1].strip()[1:-1],sep=sep).astype(np.int32),
+                    np.fromstring(line_content[2].strip()[1:-1], sep=sep).astype(np.int32)
+                    cv2.fillPoly(line_mask, [np.stack([x_points, y_points], axis=1)], 255)
+                    print([np.stack([x_points, y_points], axis=1)])
+                    line_heights.append(max(y_points) - min(y_points))
+                else:
+                    raise ValueError('line label format error')
+            else:
+                break
+
+            line_median_height = int(statistics.median(line_heights) * LINE_HEIGHT_RATIO)
+            assert line_median_height != 0
+    mask = np.stack([line_mask],axis=0)
+    mask[mask == 255] = 1
+    return mask    
 
 
