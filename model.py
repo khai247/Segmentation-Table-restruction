@@ -20,14 +20,14 @@ class DoubleConv(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=1, features=[64, 128, 256, 256]):
+    def __init__(self, in_channels=3, out_channels=1, features=[64, 128, 256, 512]):
         super(UNet, self).__init__()
         self.ups = nn.ModuleList()
         self.downs = nn.ModuleList()
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         # Down part
         for feature in features:
-            self.downs.append(DoubleConv(in_channels, features))
+            self.downs.append(DoubleConv(in_channels, feature))
             in_channels = feature
         # Up part
         for feature in reversed(features):
@@ -47,20 +47,24 @@ class UNet(nn.Module):
         skip_connections = skip_connections[::-1]
 
         for index in range(0, len(self.ups), 2):
+            #print(x.shape)
             x = self.ups[index](x)
-            skip_connections = skip_connections[index // 2]
+            skip_connection = skip_connections[index // 2]
 
-            if x.shape != skip_connections.shape:
-                x = TF.resize(x, size=skip_connections.shape[2:])
+            if x.shape != skip_connection.shape:
+                x = TF.resize(x, size=skip_connection.shape[2:])
 
-            concat_skip = torch.cat((skip_connections, x), dim=1)
+            concat_skip = torch.cat((skip_connection, x), dim=1)
             x = self.ups[index + 1](concat_skip)
 
         return self.final_conv(x)
 def test():
-  x = torch.randn((3,1,160,160))
-  model = UNet(in_channels=1,out_channels=1)
-  preds = model(x)
-  assert preds.shape == x.shape
+    x = torch.randn((3,1,160,160))
+    model = UNet(in_channels=1, out_channels=1)
+    preds = model(x)
+    print(preds.shape)
+    print(x.shape)
+    assert preds.shape == x.shape
+
 if __name__ == "__main__":
     test()
