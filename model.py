@@ -56,8 +56,12 @@ class UNet(nn.Module):
 
             concat_skip = torch.cat((skip_connection, x), dim=1)
             x = self.ups[index + 1](concat_skip)
+        #print(x.shape)
+        y = self.final_conv(x)
+        #print(y.shape)
 
         return self.final_conv(x)
+
 def test():
     x = torch.randn((3,1,160,160))
     model = UNet(in_channels=1, out_channels=1)
